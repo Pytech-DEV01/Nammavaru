@@ -649,6 +649,18 @@ function App() {
                   Your ticket is free; event date and location details will be
                   shared once they&apos;re confirmed.
                 </p>
+                <p className="mt-4 max-w-md text-sm leading-6 text-stone-600">
+                  Join our official WhatsApp group to receive further details
+                  and important event updates.
+                </p>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-forest-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-forest-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-900"
+                >
+                  Join the WhatsApp group <ArrowIcon diagonal />
+                </a>
                 <div className="my-7 rounded-2xl bg-[#f7f7f3] p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500">
                     Registration details
