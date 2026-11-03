@@ -15,6 +15,8 @@ const HEADER_ALIASES = {
   age: ['age'],
 }
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000
+const WHATSAPP_GROUP_URL =
+  'https://chat.whatsapp.com/F6IxIfgYDJvFY1DwFJoE2l?s=cl&p=a&mlu=4&ilr=4&iam=2'
 
 function authorizeSpreadsheetAccess() {
   const spreadsheetId = PropertiesService.getScriptProperties().getProperty(
@@ -134,14 +136,35 @@ function doPost(event) {
 
     let emailSent = false
     try {
+      const safeName = escapeHtml(registration.name)
       MailApp.sendEmail({
         to: registration.email,
-        subject: "You're registered for NAMMAVARU",
+        subject: 'Your NAMMAVARU registration is confirmed!',
         body:
           'Hi ' +
           registration.name +
-          ',\n\nYour free registration for NAMMAVARU is confirmed. Event date and location details will be shared once they are confirmed.\n\nThank you,\nNAMMAVARU Team',
-        name: 'NAMMAVARU Team',
+          '!\n\nYour registration has been successfully confirmed!\n\n' +
+          "We're excited to have you join us for an unforgettable experience filled with Kannada culture, fun games, unexpected conversations and new connections.\n\n" +
+          'One important step: Join our official WhatsApp group to receive event updates, important announcements and further instructions.\n\n' +
+          'Join the WhatsApp Group: ' +
+          WHATSAPP_GROUP_URL +
+          '\n\nMake sure to join the group and stay connected!\n\n' +
+          'Come as a stranger, leave with a story. See you there!\n\n' +
+          'Regards,\nTeam Organisers',
+        htmlBody:
+          '<p>Hi ' +
+          safeName +
+          '!</p>' +
+          '<p>Your registration has been successfully confirmed! 🎉</p>' +
+          '<p>We&#39;re excited to have you join us for an unforgettable experience filled with Kannada culture, fun games, unexpected conversations and new connections.</p>' +
+          '<p><strong>One important step:</strong> Join our official WhatsApp group to receive event updates, important announcements and further instructions.</p>' +
+          '<p>👉 <strong><a href="' +
+          WHATSAPP_GROUP_URL +
+          '">Join the WhatsApp Group</a></strong></p>' +
+          '<p>Make sure to join the group and stay connected!</p>' +
+          '<p><strong>Come as a stranger, leave with a story. See you there! ❤️</strong></p>' +
+          '<p>Regards,<br>Team Organisers</p>',
+        name: 'Team Organisers',
       })
       emailSent = true
     } catch (error) {
@@ -207,4 +230,16 @@ function isValidRegistration(registration) {
 
 function safeCellValue(value) {
   return /^[=+\-@]/.test(value) ? "'" + value : value
+}
+
+function escapeHtml(value) {
+  return value.replace(/[&<>"']/g, function (character) {
+    return {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[character]
+  })
 }
