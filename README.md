@@ -1,0 +1,1 @@
+# NAMMAVARU event registration
