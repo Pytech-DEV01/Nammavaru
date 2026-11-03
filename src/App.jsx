@@ -237,6 +237,7 @@ function Field({ field, value, onChange }) {
 function App() {
   const [form, setForm] = useState(initialForm)
   const [submitted, setSubmitted] = useState(false)
+  const [emailConfirmationSent, setEmailConfirmationSent] = useState(false)
   const [registering, setRegistering] = useState(false)
   const [submissionError, setSubmissionError] = useState('')
   const carouselRef = useRef(null)
@@ -368,6 +369,7 @@ function App() {
         throw new Error(result.error ?? 'Could not save your registration.')
       }
 
+      setEmailConfirmationSent(result.emailSent === true)
       setSubmitted(true)
     } catch (error) {
       setSubmissionError(
@@ -641,7 +643,9 @@ function App() {
                   Thanks, {form.name.split(' ')[0]}.
                 </h3>
                 <p className="mt-3 max-w-md text-sm leading-6 text-stone-600">
-                  Your registration has been saved to the NAMMAVARU workbook.
+                  {emailConfirmationSent
+                    ? `A confirmation email has been sent to ${form.email}.`
+                    : 'Your registration is saved, but we could not send a confirmation email. Please check your email address or contact the organizers.'}{' '}
                   Your ticket is free; event date and location details will be
                   shared once they&apos;re confirmed.
                 </p>

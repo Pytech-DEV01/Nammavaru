@@ -22,6 +22,7 @@ function authorizeSpreadsheetAccess() {
   )
   if (!spreadsheetId) throw new Error('Set the GOOGLE_SHEET_ID script property first.')
   SpreadsheetApp.openById(spreadsheetId).getName()
+  MailApp.getRemainingDailyQuota()
 }
 
 function doPost(event) {
@@ -131,7 +132,23 @@ function doPost(event) {
       lock.releaseLock()
     }
 
-    return jsonResponse({ saved: true })
+    let emailSent = false
+    try {
+      MailApp.sendEmail({
+        to: registration.email,
+        subject: "You're registered for NAMMAVARU",
+        body:
+          'Hi ' +
+          registration.name +
+          ',\n\nYour free registration for NAMMAVARU is confirmed. Event date and location details will be shared once they are confirmed.\n\nThank you,\nNAMMAVARU Team',
+        name: 'NAMMAVARU Team',
+      })
+      emailSent = true
+    } catch (error) {
+      console.error('Registration was saved, but confirmation email failed: ' + error.message)
+    }
+
+    return jsonResponse({ saved: true, emailSent: emailSent })
   } catch (error) {
     console.error('Could not save registration to Google Sheets: ' + error.message)
     return jsonResponse({

@@ -141,7 +141,9 @@ export default async function handler(request, response) {
       })
     }
 
-    return response.status(201).json({ saved: true })
+    return response
+      .status(201)
+      .json({ saved: true, emailSent: result.emailSent === true })
   } catch (error) {
     console.error('Could not reach the Google Apps Script deployment:', error.message)
     return response.status(502).json({
