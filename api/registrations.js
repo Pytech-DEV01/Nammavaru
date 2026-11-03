@@ -1,7 +1,6 @@
-import { google } from 'googleapis'
+import { createHmac } from 'node:crypto'
 
 const maxBodyBytes = 16_384
-const headers = ['Timestamp', 'Full name', 'Email', 'Phone number', 'City', 'Age']
 
 function validateRegistration(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
@@ -62,17 +61,21 @@ function validateRegistration(payload) {
   return { ...registration, age }
 }
 
-function getServiceAccount() {
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return null
-
+function getAppsScriptUrl(value) {
   try {
-    return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
+    const url = new URL(value)
+    if (
+      url.protocol === 'https:' &&
+      url.hostname === 'script.google.com' &&
+      url.pathname.startsWith('/macros/s/') &&
+      url.pathname.endsWith('/exec')
+    ) {
+      return url
+    }
   } catch {
-    throw Object.assign(
-      new Error('Google Sheets credentials are not valid JSON.'),
-      { statusCode: 500 },
-    )
+    // Report invalid URLs through the same configuration error below.
   }
+  return null
 }
 
 export default async function handler(request, response) {
@@ -104,75 +107,46 @@ export default async function handler(request, response) {
     })
   }
 
-  const spreadsheetId = process.env.GOOGLE_SHEET_ID
-  let credentials
-  try {
-    credentials = getServiceAccount()
-  } catch (error) {
-    console.error(error.message)
-    return response.status(500).json({
-      error: 'Registration storage is not configured correctly.',
-    })
-  }
-
-  if (!spreadsheetId || !credentials?.client_email || !credentials?.private_key) {
+  const appsScriptUrl = getAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL)
+  const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET
+  if (!appsScriptUrl || !secret) {
     return response.status(503).json({
       error: 'Registration storage is not configured. Please contact the organizer.',
     })
   }
 
-  try {
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    })
-    const sheets = google.sheets({ version: 'v4', auth })
-    const range = 'Registrations!A1:F1'
-    const headerResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range,
-    })
-    const currentHeaders = headerResponse.data.values?.[0]
+  const timestamp = String(Date.now())
+  const data = JSON.stringify(registration)
+  const signature = createHmac('sha256', secret)
+    .update(`${timestamp}.${data}`)
+    .digest('hex')
 
-    if (!currentHeaders?.length) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range,
-        valueInputOption: 'RAW',
-        requestBody: { values: [headers] },
-      })
-    } else if (headers.some((header, index) => currentHeaders[index] !== header)) {
-      return response.status(500).json({
+  try {
+    const appsScriptResponse = await fetch(appsScriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timestamp, data, signature }),
+    })
+    const result = await appsScriptResponse.json()
+
+    if (!appsScriptResponse.ok || result.saved !== true) {
+      console.error(
+        'Could not save registration through Apps Script:',
+        result.error ?? `HTTP ${appsScriptResponse.status}`,
+      )
+      return response.status(502).json({
         error:
-          'The Registrations sheet needs these headers in row 1: Timestamp, Full name, Email, Phone number, City, Age.',
+          result.error ??
+          'Could not save your registration. Check the Apps Script deployment and try again.',
       })
     }
 
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: 'Registrations!A:F',
-      valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      requestBody: {
-        values: [
-          [
-            new Date().toISOString(),
-            registration.name,
-            registration.email,
-            registration.phone,
-            registration.location,
-            registration.age,
-          ],
-        ],
-      },
-    })
-
     return response.status(201).json({ saved: true })
   } catch (error) {
-    console.error('Could not save registration to Google Sheets:', error.message)
-    return response.status(500).json({
+    console.error('Could not reach the Google Apps Script deployment:', error.message)
+    return response.status(502).json({
       error:
-        'Could not save your registration. Check the Google Sheets setup and try again.',
+        'Could not reach the Google Sheets service. Check the Apps Script deployment URL and try again.',
     })
   }
 }
