@@ -356,6 +356,12 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, phone: `+91${form.phone}` }),
       })
+      const contentType = response.headers.get('content-type') ?? ''
+      if (!contentType.includes('application/json')) {
+        throw new Error(
+          'The registration service is not available on this site. Run the app with npm run dev, or configure your host to route /api/registrations to the Node.js server.',
+        )
+      }
       const result = await response.json()
 
       if (!response.ok) {
