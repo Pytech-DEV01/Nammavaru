@@ -6,6 +6,14 @@ const HEADERS = [
   'City',
   'Age',
 ]
+const HEADER_ALIASES = {
+  timestamp: ['timestamp', 'submittedat', 'createdat'],
+  name: ['name', 'fullname'],
+  email: ['email', 'emailaddress'],
+  phone: ['phone', 'phonenumber', 'phno'],
+  location: ['city', 'location'],
+  age: ['age'],
+}
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000
 
 function authorizeSpreadsheetAccess() {
@@ -74,33 +82,51 @@ function doPost(event) {
       const spreadsheet = SpreadsheetApp.openById(spreadsheetId)
       const sheet =
         spreadsheet.getSheetByName('Registrations') ??
+        spreadsheet.getSheets()[0] ??
         spreadsheet.insertSheet('Registrations')
-      const headerRange = sheet.getRange(1, 1, 1, HEADERS.length)
-      const currentHeaders = headerRange.getValues()[0]
-
-      if (currentHeaders.every(function (value) { return value === '' })) {
-        headerRange.setValues([HEADERS])
-        headerRange.setFontWeight('bold')
-      } else if (
-        HEADERS.some(function (header, index) {
-          return currentHeaders[index] !== header
-        })
-      ) {
-        return jsonResponse({
-          saved: false,
-          error:
-            'The Registrations sheet needs these headers in row 1: Timestamp, Full name, Email, Phone number, City, Age.',
-        })
+      let lastColumn = sheet.getLastColumn()
+      if (lastColumn === 0) {
+        sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS])
+        sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold')
+        lastColumn = HEADERS.length
       }
 
-      sheet.appendRow([
-        new Date(),
-        safeCellValue(registration.name),
-        safeCellValue(registration.email),
-        safeCellValue(registration.phone),
-        safeCellValue(registration.location),
-        registration.age,
-      ])
+      const currentHeaders = sheet
+        .getRange(1, 1, 1, lastColumn)
+        .getValues()[0]
+      const columnIndexes = new Map()
+      currentHeaders.forEach(function (header, index) {
+        const normalizedHeader = String(header).toLowerCase().replace(/[^a-z0-9]/g, '')
+        for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+          if (aliases.includes(normalizedHeader) && !columnIndexes.has(field)) {
+            columnIndexes.set(field, index + 1)
+          }
+        }
+      })
+
+      for (const [field, header] of Object.entries({
+        timestamp: 'Timestamp',
+        name: 'Full name',
+        email: 'Email',
+        phone: 'Phone number',
+        location: 'City',
+        age: 'Age',
+      })) {
+        if (!columnIndexes.has(field)) {
+          lastColumn += 1
+          sheet.getRange(1, lastColumn).setValue(header).setFontWeight('bold')
+          columnIndexes.set(field, lastColumn)
+        }
+      }
+
+      const row = Array(lastColumn).fill('')
+      row[columnIndexes.get('timestamp') - 1] = new Date()
+      row[columnIndexes.get('name') - 1] = safeCellValue(registration.name)
+      row[columnIndexes.get('email') - 1] = safeCellValue(registration.email)
+      row[columnIndexes.get('phone') - 1] = safeCellValue(registration.phone)
+      row[columnIndexes.get('location') - 1] = safeCellValue(registration.location)
+      row[columnIndexes.get('age') - 1] = registration.age
+      sheet.appendRow(row)
     } finally {
       lock.releaseLock()
     }
